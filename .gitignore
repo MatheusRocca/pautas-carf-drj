@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Dados de clientes (não versionar)
+Clientes monitorados*.xlsx
+Clientes monitorados*.csv
+*.gsheet
+
+# Saídas geradas
+pautas*.xlsx
+
+# macOS
+.DS_Store
+
+# Login do INLabs (nunca versionar) e DOU baixado
+inlabs.ini
+DOU/
+
+# Modo automático: conta de e-mail (nunca versionar), estado e logs
+email.ini
+
+# Chave da conta de serviço do Google (nunca versionar)
+*-api-*.json
+google*.json
+automatico_estado.json
+logs/
+
+# Testes: versiona o código e as fixtures, não as cópias do DOU baixadas
+tests/20*-DO*/
+!tests/fixtures/*.xml

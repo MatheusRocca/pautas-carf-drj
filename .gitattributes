@@ -1,0 +1,2 @@
+# Fixtures são cópias exatas do DOU: não converter quebras de linha
+tests/fixtures/*.xml -text

@@ -1,0 +1,87 @@
+# Modo automático no GitHub Actions (execução manual ou por chamada externa,
+# p. ex. cron-job.org, em dias úteis às 8h30, 13h e 18h). O estado (dias concluídos, clientes
+# avisados, pautas já vistas) fica guardado no branch "estado".
+#
+# Segredos necessários (Settings → Secrets and variables → Actions):
+#   INLABS_EMAIL, INLABS_SENHA            login do INLabs
+#   EMAIL_USUARIO, EMAIL_SENHA            conta que envia (Gmail: senha de app)
+#   EMAIL_DESTINATARIOS                   separados por vírgula
+#   GOOGLE_CREDENCIAIS                    JSON da conta de serviço do Google
+#   CLIENTES_PLANILHA_ID                  ID da planilha de clientes no Google Sheets
+# Opcionais: EMAIL_SERVIDOR (padrão smtp.gmail.com), EMAIL_PORTA (padrão 465)
+
+name: Pautas CARF/DRJ
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: pautas
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  pautas:
+    # versão fixa: o ubuntu-latest muda sozinho (Ubuntu 26 a partir de 19/10/2026)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      TZ: America/Sao_Paulo
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Instala dependências
+        run: pip install -r requirements.txt google-auth requests
+
+      - name: Recupera o estado
+        run: |
+          if git fetch --depth=1 origin estado 2>/dev/null; then
+            git show FETCH_HEAD:automatico_estado.json > automatico_estado.json
+            echo "ESTADO_ANTERIOR=$(git rev-parse FETCH_HEAD)" >> "$GITHUB_ENV"
+          else
+            echo "Sem estado salvo ainda — primeira execução."
+          fi
+
+      - name: Processa o DOU e avisa
+        env:
+          INLABS_EMAIL: ${{ secrets.INLABS_EMAIL }}
+          INLABS_SENHA: ${{ secrets.INLABS_SENHA }}
+          EMAIL_SERVIDOR: ${{ secrets.EMAIL_SERVIDOR }}
+          EMAIL_PORTA: ${{ secrets.EMAIL_PORTA }}
+          EMAIL_USUARIO: ${{ secrets.EMAIL_USUARIO }}
+          EMAIL_SENHA: ${{ secrets.EMAIL_SENHA }}
+          EMAIL_DESTINATARIOS: ${{ secrets.EMAIL_DESTINATARIOS }}
+          GOOGLE_CREDENCIAIS: ${{ secrets.GOOGLE_CREDENCIAIS }}
+          CLIENTES_PLANILHA_ID: ${{ secrets.CLIENTES_PLANILHA_ID }}
+        run: python -u pautas_carf.py --automatico
+
+      - name: Salva o estado
+        if: always()
+        run: |
+          [ -f automatico_estado.json ] || exit 0
+          blob=$(git hash-object -w automatico_estado.json)
+          tree=$(printf '100644 blob %s\tautomatico_estado.json\n' "$blob" | git mktree)
+          if [ "$tree" = "$(git rev-parse -q --verify "${ESTADO_ANTERIOR:-none}^{tree}" 2>/dev/null)" ]; then
+            echo "Estado sem mudanças."; exit 0
+          fi
+          commit=$(git -c user.name="github-actions[bot]" \
+                       -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+                       commit-tree "$tree" ${ESTADO_ANTERIOR:+-p "$ESTADO_ANTERIOR"} \
+                       -m "Estado após execução de $(date '+%d/%m/%Y %H:%M')")
+          git push origin "$commit:refs/heads/estado"
+
+      - name: Guarda as planilhas geradas
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: planilhas-${{ github.run_id }}
+          path: pautas_*.xlsx
+          if-no-files-found: ignore
+          retention-days: 30
