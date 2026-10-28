@@ -19,15 +19,15 @@ Requer Python 3 (testado no 3.10 e no 3.12).
 ```bash
 pip install -r requirements.txt
 
-# processar XMLs/ZIPs que você já tem
-python pautas_carf.py ./2026-09-25-DO1 saida.xlsx
+# testar sem login: usa os XMLs de exemplo que vêm no repositório
+python pautas_carf.py tests/fixtures saida.xlsx
 
-# cruzar com uma lista de clientes
-python pautas_carf.py ./2026-09-25-DO1 saida.xlsx --clientes clientes.xlsx
-
-# baixar o DOU de hoje (ou de outra data) e processar
+# baixar o DOU de hoje (ou de outra data) e processar — precisa do login do INLabs (abaixo)
 python pautas_carf.py --baixar
 python pautas_carf.py --baixar 2026-09-25
+
+# cruzar com uma lista de clientes (.xlsx ou .csv com uma coluna "Nome")
+python pautas_carf.py --baixar --clientes clientes.xlsx
 
 # sem argumentos: abre um menu no terminal
 python pautas_carf.py
